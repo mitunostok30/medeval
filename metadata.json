@@ -1,0 +1,8 @@
+
+{
+  "name": "MedEval: Academic Evaluation System",
+  "description": "A comprehensive, anonymous teacher and phase-wise evaluation system for medical colleges featuring student surveys and administrative dashboards.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
