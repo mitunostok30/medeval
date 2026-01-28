@@ -1,0 +1,3 @@
+module.exports=[64433,a=>{a.v({className:"inter_5972bc34-module__OU16Qa__className"})},65280,a=>{"use strict";var b=a.i(76595),c=a.i(64433);let d={className:c.default.className,style:{fontFamily:"'Inter', 'Inter Fallback'",fontStyle:"normal"}};function e({children:a}){return(0,b.jsx)("html",{lang:"en",children:(0,b.jsx)("body",{className:`${d.className} min-h-screen bg-slate-50`,children:a})})}null!=c.default.variable&&(d.variable=c.default.variable),a.s(["default",()=>e,"metadata",0,{title:"MedEval - Academic Evaluation System",description:"Medical College Phase-Wise and Teacher Evaluation System"}],65280)}];
+
+//# sourceMappingURL=%5Broot-of-the-server%5D__41db3c10._.js.map
