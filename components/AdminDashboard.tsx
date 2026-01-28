@@ -19,7 +19,11 @@ import {
   Cell
 } from 'recharts';
 
-const AdminDashboard: React.FC = () => {
+interface AdminDashboardProps {
+  onLogout: () => void;
+}
+
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState<'teachers' | 'environment' | 'problems' | 'manage'>('teachers');
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [evaluations, setEvaluations] = useState<any[]>([]);
@@ -165,6 +169,20 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleDeleteTeacher = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this teacher? This will not delete their evaluations, but they will appear as 'Unknown'.")) return;
+
+    try {
+      const res = await fetch(`/api/teachers?id=${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      setTeachers(teachers.filter(t => t.id !== id));
+    } catch (err: any) {
+      alert("Failed to delete teacher: " + err.message);
+    }
+  };
+
   const handleExportCSV = () => {
     if (evaluations.length === 0) {
       alert("No data available to export.");
@@ -234,6 +252,13 @@ const AdminDashboard: React.FC = () => {
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
             Export CSV
+          </button>
+          <button
+            onClick={onLogout}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-200 transition-colors font-medium text-sm"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+            Logout
           </button>
           <div className="flex bg-white rounded-lg p-1 shadow-sm border border-slate-200 overflow-x-auto">
             <button
@@ -450,6 +475,7 @@ const AdminDashboard: React.FC = () => {
                         <th className="px-6 py-3">Name</th>
                         <th className="px-6 py-3">Designation</th>
                         <th className="px-6 py-3">Subject</th>
+                        <th className="px-6 py-3 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -459,6 +485,14 @@ const AdminDashboard: React.FC = () => {
                           <td className="px-6 py-4 font-semibold text-slate-800">{t.name}</td>
                           <td className="px-6 py-4 text-slate-600">{t.designation}</td>
                           <td className="px-6 py-4 text-slate-600">{t.subject}</td>
+                          <td className="px-6 py-4 text-right">
+                            <button
+                              onClick={() => handleDeleteTeacher(t.id)}
+                              className="text-red-500 hover:text-red-700 font-medium text-xs p-2 hover:bg-red-50 rounded"
+                            >
+                              Delete
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>

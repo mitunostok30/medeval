@@ -3,9 +3,11 @@
 import React, { useState } from 'react';
 import StudentPortal from '@/components/StudentPortal';
 import AdminDashboard from '@/components/AdminDashboard';
+import AdminLogin from '@/components/AdminLogin';
 
 export default function Home() {
     const [view, setView] = useState<'student' | 'admin'>('student');
+    const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
 
     return (
         <div className="min-h-screen bg-slate-50 font-sans">
@@ -40,7 +42,15 @@ export default function Home() {
             </nav>
 
             <main>
-                {view === 'student' ? <StudentPortal /> : <AdminDashboard />}
+                {view === 'student' ? (
+                    <StudentPortal />
+                ) : (
+                    isAdminAuthenticated ? (
+                        <AdminDashboard onLogout={() => setIsAdminAuthenticated(false)} />
+                    ) : (
+                        <AdminLogin onLogin={() => setIsAdminAuthenticated(true)} />
+                    )
+                )}
             </main>
 
             <footer className="bg-white border-t border-slate-200 mt-20 py-8">
