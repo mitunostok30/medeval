@@ -1,71 +1,93 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { 
-  TEACHER_EVAL_ITEMS, 
-  LEARNING_ENV_ITEMS, 
-  CLINICAL_ITEMS, 
+import {
+  TEACHER_EVAL_ITEMS,
+  LEARNING_ENV_ITEMS,
+  CLINICAL_ITEMS,
   HOSTEL_ITEMS,
 } from '../constants';
 import { EvaluationRecord, Phase, Teacher } from '../types';
-import { storageService } from '../services/storage';
 import RatingScale from './RatingScale';
 
 const StudentPortal: React.FC = () => {
-  const [studentToken] = useState("STUDENT_DEMO_HASH");
+  const [studentId, setStudentId] = useState("");
+  const [studentEmail, setStudentEmail] = useState("");
   const [teachers, setTeachers] = useState<Teacher[]>([]);
-  
+
   const [phase, setPhase] = useState<Phase>(Phase.P1);
   const [selectedTeacherId, setSelectedTeacherId] = useState("");
   const [resideInHostel, setResideInHostel] = useState(false);
-  
+
   const [teacherRatings, setTeacherRatings] = useState<Record<string, number>>({});
   const [envRatings, setEnvRatings] = useState<Record<string, number>>({});
   const [clinicalRatings, setClinicalRatings] = useState<Record<string, number>>({});
   const [hostelRatings, setHostelRatings] = useState<Record<string, number>>({});
   const [isRoleModel, setIsRoleModel] = useState<boolean | null>(null);
   const [qualitativeProblems, setQualitativeProblems] = useState("");
-  
+
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | null }>({ text: '', type: null });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    setTeachers(storageService.getTeachers());
+    fetch('/api/teachers')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setTeachers(data);
+      })
+      .catch(err => console.error("Failed to fetch teachers", err));
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!selectedTeacherId) {
       setMessage({ text: "Please select a teacher.", type: 'error' });
       return;
     }
 
-    if (storageService.hasEvaluated(studentToken, selectedTeacherId)) {
-      setMessage({ text: "You have already evaluated this teacher.", type: 'error' });
+    if (!studentId || !studentEmail) {
+      setMessage({ text: "Please provide your Student ID and Email.", type: 'error' });
       return;
     }
 
-    const newEval: EvaluationRecord = {
-      id: Math.random().toString(36).substr(2, 9),
-      timestamp: Date.now(),
-      phase,
-      teacherId: selectedTeacherId,
-      ratings: teacherRatings,
-      isRoleModel: isRoleModel || false,
-      learningEnv: envRatings,
-      clinicalSkills: (phase === Phase.P3 || phase === Phase.P4) ? clinicalRatings : undefined,
-      hostel: resideInHostel ? hostelRatings : undefined,
-      resideInHostel,
-      qualitativeProblems
-    };
+    setIsSubmitting(true);
+    try {
+      const response = await fetch('/api/evaluations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId,
+          studentEmail,
+          phase,
+          teacherId: selectedTeacherId,
+          ratings: teacherRatings,
+          isRoleModel: isRoleModel || false,
+          learningEnv: envRatings,
+          clinicalSkills: (phase === Phase.P3 || phase === Phase.P4) ? clinicalRatings : undefined,
+          hostel: resideInHostel ? hostelRatings : undefined,
+          resideInHostel,
+          qualitativeProblems
+        }),
+      });
 
-    storageService.saveEvaluation(newEval);
-    storageService.addLogEntry(`${studentToken}_${selectedTeacherId}`);
-    
-    setMessage({ text: "Evaluation submitted successfully. Thank you for your feedback.", type: 'success' });
-    
-    setTeacherRatings({});
-    setIsRoleModel(null);
-    setQualitativeProblems("");
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to submit evaluation");
+      }
+
+      setMessage({ text: "Evaluation submitted successfully. Thank you for your feedback.", type: 'success' });
+
+      // Reset form
+      setTeacherRatings({});
+      setIsRoleModel(null);
+      setQualitativeProblems("");
+      setSelectedTeacherId("");
+    } catch (err: any) {
+      setMessage({ text: err.message, type: 'error' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -90,8 +112,30 @@ const StudentPortal: React.FC = () => {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Student ID</label>
+              <input
+                type="text"
+                value={studentId}
+                onChange={(e) => setStudentId(e.target.value)}
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="Enter your ID"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Email Address</label>
+              <input
+                type="email"
+                value={studentEmail}
+                onChange={(e) => setStudentEmail(e.target.value)}
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="Enter your email"
+                required
+              />
+            </div>
+            <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Phase of Study</label>
-              <select 
+              <select
                 value={phase}
                 onChange={(e) => setPhase(e.target.value as Phase)}
                 className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
@@ -101,8 +145,8 @@ const StudentPortal: React.FC = () => {
             </div>
             <div className="flex items-end pb-2">
               <label className="flex items-center space-x-3 cursor-pointer">
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   checked={resideInHostel}
                   onChange={(e) => setResideInHostel(e.target.checked)}
                   className="w-5 h-5 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
@@ -112,7 +156,7 @@ const StudentPortal: React.FC = () => {
             </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-slate-700 mb-2">Select Teacher for Evaluation</label>
-              <select 
+              <select
                 value={selectedTeacherId}
                 onChange={(e) => setSelectedTeacherId(e.target.value)}
                 className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
@@ -133,14 +177,14 @@ const StudentPortal: React.FC = () => {
             Teacher Performance
           </h2>
           <p className="text-sm text-slate-500 mb-6">Rate from 1 (Never) to 5 (Almost Always)</p>
-          
+
           <div className="space-y-2">
             {TEACHER_EVAL_ITEMS.map(item => (
-              <RatingScale 
+              <RatingScale
                 key={item}
                 label={item}
                 value={teacherRatings[item] || 0}
-                onChange={(val) => setTeacherRatings(prev => ({...prev, [item]: val}))}
+                onChange={(val) => setTeacherRatings(prev => ({ ...prev, [item]: val }))}
               />
             ))}
           </div>
@@ -172,14 +216,14 @@ const StudentPortal: React.FC = () => {
             Learning Environment
           </h2>
           <p className="text-sm text-slate-500 mb-6">Satisfaction with institutional facilities and phase routine.</p>
-          
+
           <div className="space-y-2">
             {LEARNING_ENV_ITEMS.map(item => (
-              <RatingScale 
+              <RatingScale
                 key={item}
                 label={item}
                 value={envRatings[item] || 0}
-                onChange={(val) => setEnvRatings(prev => ({...prev, [item]: val}))}
+                onChange={(val) => setEnvRatings(prev => ({ ...prev, [item]: val }))}
               />
             ))}
           </div>
@@ -192,14 +236,14 @@ const StudentPortal: React.FC = () => {
               Clinical Phase Evaluation
             </h2>
             <p className="text-sm text-slate-500 mb-6">Specific items for students in the 3rd or 4th clinical phases.</p>
-            
+
             <div className="space-y-2">
               {CLINICAL_ITEMS.map(item => (
-                <RatingScale 
+                <RatingScale
                   key={item}
                   label={item}
                   value={clinicalRatings[item] || 0}
-                  onChange={(val) => setClinicalRatings(prev => ({...prev, [item]: val}))}
+                  onChange={(val) => setClinicalRatings(prev => ({ ...prev, [item]: val }))}
                 />
               ))}
             </div>
@@ -213,14 +257,14 @@ const StudentPortal: React.FC = () => {
               Hostel Environment
             </h2>
             <p className="text-sm text-slate-500 mb-6">Feedback regarding residential life.</p>
-            
+
             <div className="space-y-2">
               {HOSTEL_ITEMS.map(item => (
-                <RatingScale 
+                <RatingScale
                   key={item}
                   label={item}
                   value={hostelRatings[item] || 0}
-                  onChange={(val) => setHostelRatings(prev => ({...prev, [item]: val}))}
+                  onChange={(val) => setHostelRatings(prev => ({ ...prev, [item]: val }))}
                 />
               ))}
             </div>
@@ -236,7 +280,7 @@ const StudentPortal: React.FC = () => {
             <label className="block text-sm font-medium text-slate-700 mb-2">
               Do you think there are problems in formative assessments (items, cards, terms) or the overall environment? Mention below:
             </label>
-            <textarea 
+            <textarea
               rows={4}
               value={qualitativeProblems}
               onChange={(e) => setQualitativeProblems(e.target.value)}
@@ -246,11 +290,12 @@ const StudentPortal: React.FC = () => {
           </div>
         </div>
 
-        <button 
+        <button
           type="submit"
-          className="w-full py-4 bg-blue-900 text-white rounded-xl font-bold text-lg hover:bg-blue-800 transition-colors shadow-lg sticky bottom-4 z-10"
+          disabled={isSubmitting}
+          className={`w-full py-4 bg-blue-900 text-white rounded-xl font-bold text-lg hover:bg-blue-800 transition-colors shadow-lg sticky bottom-4 z-10 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
-          Submit Anonymous Evaluation
+          {isSubmitting ? 'Submitting...' : 'Submit Evaluation'}
         </button>
       </form>
     </div>

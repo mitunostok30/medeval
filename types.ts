@@ -18,6 +18,8 @@ export interface EvaluationRecord {
   timestamp: number;
   phase: Phase;
   teacherId: string;
+  studentId: string;
+  studentEmail: string;
   ratings: Record<string, number>; // 1-5
   isRoleModel: boolean;
   learningEnv: Record<string, number>;

@@ -1,37 +1,44 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { 
-  TEACHER_EVAL_ITEMS, 
-  LEARNING_ENV_ITEMS, 
-  CLINICAL_ITEMS, 
+import {
+  TEACHER_EVAL_ITEMS,
+  LEARNING_ENV_ITEMS,
+  CLINICAL_ITEMS,
   HOSTEL_ITEMS,
   RATING_LABELS
 } from '../constants';
 import { Teacher } from '../types';
-import { storageService } from '../services/storage';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
   Cell
 } from 'recharts';
 
 const AdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'teachers' | 'environment' | 'problems' | 'manage'>('teachers');
   const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [evaluations, setEvaluations] = useState<any[]>([]);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(null);
-  const evaluations = useMemo(() => storageService.getEvaluations(), []);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Form State for adding teacher
   const [newTeacher, setNewTeacher] = useState({ name: '', designation: '', subject: '' });
   const [formMessage, setFormMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
-    setTeachers(storageService.getTeachers());
+    Promise.all([
+      fetch('/api/teachers').then(res => res.json()),
+      fetch('/api/evaluations').then(res => res.json())
+    ]).then(([teachersData, evalsData]) => {
+      if (Array.isArray(teachersData)) setTeachers(teachersData);
+      if (Array.isArray(evalsData)) setEvaluations(evalsData);
+    }).catch(err => console.error("Failed to fetch dashboard data", err))
+      .finally(() => setIsLoading(false));
   }, []);
 
   // Teacher Stats Summary
@@ -39,7 +46,7 @@ const AdminDashboard: React.FC = () => {
     return teachers.map(teacher => {
       const teacherEvals = evaluations.filter(e => e.teacherId === teacher.id);
       const totalResponses = teacherEvals.length;
-      
+
       let totalScore = 0;
       let scoreCount = 0;
       let roleModelCount = 0;
@@ -71,7 +78,7 @@ const AdminDashboard: React.FC = () => {
     if (!teacher) return null;
 
     const teacherEvals = evaluations.filter(e => e.teacherId === selectedTeacherId);
-    
+
     const itemAverages = TEACHER_EVAL_ITEMS.map(item => {
       let sum = 0;
       let count = 0;
@@ -133,25 +140,29 @@ const AdminDashboard: React.FC = () => {
     });
   }, [evaluations]);
 
-  const handleAddTeacher = (e: React.FormEvent) => {
+  const handleAddTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTeacher.name || !newTeacher.designation || !newTeacher.subject) {
       setFormMessage({ text: "Please fill all fields.", type: 'error' });
       return;
     }
 
-    const teacher: Teacher = {
-      id: 'T' + Date.now(),
-      name: newTeacher.name,
-      designation: newTeacher.designation,
-      subject: newTeacher.subject
-    };
+    try {
+      const res = await fetch('/api/teachers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newTeacher)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
 
-    storageService.saveTeacher(teacher);
-    setTeachers(storageService.getTeachers());
-    setNewTeacher({ name: '', designation: '', subject: '' });
-    setFormMessage({ text: "Teacher added successfully!", type: 'success' });
-    setTimeout(() => setFormMessage(null), 3000);
+      setTeachers([...teachers, { id: data.id, ...newTeacher }]);
+      setNewTeacher({ name: '', designation: '', subject: '' });
+      setFormMessage({ text: "Teacher added successfully!", type: 'success' });
+      setTimeout(() => setFormMessage(null), 3000);
+    } catch (err: any) {
+      setFormMessage({ text: err.message, type: 'error' });
+    }
   };
 
   const handleExportCSV = () => {
@@ -161,7 +172,7 @@ const AdminDashboard: React.FC = () => {
     }
 
     const headers = [
-      "Timestamp", "Phase", "Teacher Name", "Designation", "Subject",
+      "Timestamp", "Student ID", "Student Email", "Phase", "Teacher Name", "Designation", "Subject",
       ...TEACHER_EVAL_ITEMS,
       "Is Role Model",
       ...LEARNING_ENV_ITEMS,
@@ -174,6 +185,8 @@ const AdminDashboard: React.FC = () => {
       const teacher = teachers.find(t => t.id === ev.teacherId);
       const dataRow = [
         new Date(ev.timestamp).toLocaleString(),
+        ev.studentId,
+        ev.studentEmail,
         ev.phase,
         teacher?.name || 'Unknown',
         teacher?.designation || 'Unknown',
@@ -183,7 +196,7 @@ const AdminDashboard: React.FC = () => {
         ...LEARNING_ENV_ITEMS.map(item => ev.learningEnv[item] || ''),
         ...CLINICAL_ITEMS.map(item => ev.clinicalSkills?.[item] || 'N/A'),
         ...HOSTEL_ITEMS.map(item => ev.hostel?.[item] || 'N/A'),
-        `"${ev.qualitativeProblems.replace(/"/g, '""')}"`
+        `"${(ev.qualitativeProblems || '').replace(/"/g, '""')}"`
       ];
       return dataRow.join(',');
     });
@@ -215,7 +228,7 @@ const AdminDashboard: React.FC = () => {
           <p className="text-slate-500">Evaluation summaries and institutional insights</p>
         </div>
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          <button 
+          <button
             onClick={handleExportCSV}
             className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm font-medium text-sm"
           >
@@ -223,25 +236,25 @@ const AdminDashboard: React.FC = () => {
             Export CSV
           </button>
           <div className="flex bg-white rounded-lg p-1 shadow-sm border border-slate-200 overflow-x-auto">
-            <button 
+            <button
               onClick={() => setActiveTab('teachers')}
               className={`px-4 py-2 rounded-md transition-all whitespace-nowrap ${activeTab === 'teachers' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}
             >
               Stats
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('environment')}
               className={`px-4 py-2 rounded-md transition-all whitespace-nowrap ${activeTab === 'environment' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}
             >
               Environment
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('problems')}
               className={`px-4 py-2 rounded-md transition-all whitespace-nowrap ${activeTab === 'problems' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}
             >
               Problems
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('manage')}
               className={`px-4 py-2 rounded-md transition-all whitespace-nowrap ${activeTab === 'manage' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}
             >
@@ -282,8 +295,8 @@ const AdminDashboard: React.FC = () => {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis dataKey="name" fontSize={10} tick={{ fill: '#64748b' }} angle={-15} textAnchor="end" height={60} />
                       <YAxis domain={[0, 5]} fontSize={12} tick={{ fill: '#64748b' }} />
-                      <Tooltip cursor={{fill: '#f1f5f9'}} />
-                      <Bar dataKey="avgScore" name="Avg Rating" radius={[4, 4, 0, 0]} onClick={(data) => setSelectedTeacherId(data.id)}>
+                      <Tooltip cursor={{ fill: '#f1f5f9' }} />
+                      <Bar dataKey="avgScore" name="Avg Rating" radius={[4, 4, 0, 0]} onClick={(data) => setSelectedTeacherId(data.id || null)}>
                         {teacherStats.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.avgScore > 4 ? '#059669' : (entry.avgScore > 3 ? '#2563eb' : '#dc2626')} className="cursor-pointer hover:opacity-80" />
                         ))}
@@ -309,7 +322,7 @@ const AdminDashboard: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="text-sm divide-y divide-slate-100">
-                      {[...teacherStats].sort((a,b) => b.avgScore - a.avgScore).map(t => (
+                      {[...teacherStats].sort((a, b) => b.avgScore - a.avgScore).map(t => (
                         <tr key={t.id} className={`hover:bg-blue-50 transition-colors cursor-pointer ${selectedTeacherId === t.id ? 'bg-blue-50 border-l-4 border-blue-600' : ''}`} onClick={() => setSelectedTeacherId(t.id)}>
                           <td className="px-6 py-4">
                             <p className="font-bold text-slate-800">{t.name}</p>
@@ -337,7 +350,7 @@ const AdminDashboard: React.FC = () => {
                     <h2 className="text-2xl font-bold text-blue-900">{selectedTeacherDetails.name}</h2>
                     <p className="text-slate-500">{selectedTeacherDetails.designation} of {selectedTeacherDetails.subject} • Based on {selectedTeacherDetails.totalEvals} evaluations</p>
                   </div>
-                  <button 
+                  <button
                     onClick={() => setSelectedTeacherId(null)}
                     className="p-2 hover:bg-slate-100 rounded-full transition-colors"
                   >
@@ -355,7 +368,7 @@ const AdminDashboard: React.FC = () => {
                         </span>
                       </div>
                       <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
-                        <div 
+                        <div
                           className={`h-full transition-all duration-1000 ${item.average > 4 ? 'bg-emerald-500' : (item.average > 3 ? 'bg-blue-500' : 'bg-rose-500')}`}
                           style={{ width: `${(item.average / 5) * 100}%` }}
                         />
@@ -373,7 +386,7 @@ const AdminDashboard: React.FC = () => {
             <div className="lg:col-span-1">
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm sticky top-24">
                 <h3 className="font-bold text-xl text-slate-800 mb-6">Add New Teacher</h3>
-                
+
                 {formMessage && (
                   <div className={`mb-4 p-3 rounded text-sm font-medium ${formMessage.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                     {formMessage.text}
@@ -383,10 +396,10 @@ const AdminDashboard: React.FC = () => {
                 <form onSubmit={handleAddTeacher} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       value={newTeacher.name}
-                      onChange={e => setNewTeacher({...newTeacher, name: e.target.value})}
+                      onChange={e => setNewTeacher({ ...newTeacher, name: e.target.value })}
                       className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                       placeholder="e.g. Dr. Alice Smith"
                       required
@@ -394,10 +407,10 @@ const AdminDashboard: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Designation</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       value={newTeacher.designation}
-                      onChange={e => setNewTeacher({...newTeacher, designation: e.target.value})}
+                      onChange={e => setNewTeacher({ ...newTeacher, designation: e.target.value })}
                       className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                       placeholder="e.g. Professor"
                       required
@@ -405,16 +418,16 @@ const AdminDashboard: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Subject</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       value={newTeacher.subject}
-                      onChange={e => setNewTeacher({...newTeacher, subject: e.target.value})}
+                      onChange={e => setNewTeacher({ ...newTeacher, subject: e.target.value })}
                       className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                       placeholder="e.g. Pathology"
                       required
                     />
                   </div>
-                  <button 
+                  <button
                     type="submit"
                     className="w-full py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors shadow-sm"
                   >
@@ -470,7 +483,7 @@ const AdminDashboard: React.FC = () => {
                       </span>
                     </div>
                     <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className={`h-full ${item.avg > 3.5 ? 'bg-green-500' : (item.avg > 2.5 ? 'bg-yellow-500' : 'bg-red-500')}`}
                         style={{ width: `${(item.avg / 5) * 100}%` }}
                       ></div>
@@ -492,7 +505,7 @@ const AdminDashboard: React.FC = () => {
                       </span>
                     </div>
                     <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className={`h-full ${item.avg > 3.5 ? 'bg-green-500' : (item.avg > 2.5 ? 'bg-yellow-500' : 'bg-red-500')}`}
                         style={{ width: `${(item.avg / 5) * 100}%` }}
                       ></div>
@@ -513,13 +526,15 @@ const AdminDashboard: React.FC = () => {
               {evaluations.filter(e => e.qualitativeProblems.trim() !== "").length === 0 ? (
                 <div className="p-12 text-center text-slate-400">No specific problems reported yet.</div>
               ) : (
-                evaluations.filter(e => e.qualitativeProblems.trim() !== "").map((ev, idx) => (
+                evaluations.filter(e => e.qualitativeProblems && e.qualitativeProblems.trim() !== "").map((ev, idx) => (
                   <div key={idx} className="p-6 hover:bg-slate-50 transition-colors">
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
                       <span className="px-2 py-1 bg-blue-100 text-blue-700 text-[10px] font-bold rounded uppercase">
                         {ev.phase}
                       </span>
                       <span className="text-xs text-slate-400">{new Date(ev.timestamp).toLocaleDateString()}</span>
+                      <span className="text-xs font-medium text-slate-600">SID: {ev.studentId}</span>
+                      <span className="text-xs text-slate-400">({ev.studentEmail})</span>
                     </div>
                     <p className="text-slate-700 leading-relaxed italic">"{ev.qualitativeProblems}"</p>
                   </div>
