@@ -12,7 +12,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
         e.preventDefault();
         // For now, using a simple password. 
         // In a real app, this should be a proper backend-verified session.
-        if (password === "admin123") {
+        if (password === "1123581321") {
             onLogin();
         } else {
             setError("Incorrect password. Please try again.");
