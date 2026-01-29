@@ -117,7 +117,7 @@ const StudentPortal: React.FC = () => {
                 type="text"
                 value={studentId}
                 onChange={(e) => setStudentId(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-slate-900"
                 placeholder="Enter your ID"
                 required
               />
@@ -128,7 +128,7 @@ const StudentPortal: React.FC = () => {
                 type="email"
                 value={studentEmail}
                 onChange={(e) => setStudentEmail(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-slate-900"
                 placeholder="Enter your email"
                 required
               />
@@ -138,7 +138,7 @@ const StudentPortal: React.FC = () => {
               <select
                 value={phase}
                 onChange={(e) => setPhase(e.target.value as Phase)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-slate-900"
               >
                 {Object.values(Phase).map(p => <option key={p} value={p}>{p}</option>)}
               </select>
@@ -159,7 +159,7 @@ const StudentPortal: React.FC = () => {
               <select
                 value={selectedTeacherId}
                 onChange={(e) => setSelectedTeacherId(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-slate-900"
                 required
               >
                 <option value="">-- Choose Teacher --</option>
@@ -284,7 +284,7 @@ const StudentPortal: React.FC = () => {
               rows={4}
               value={qualitativeProblems}
               onChange={(e) => setQualitativeProblems(e.target.value)}
-              className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-slate-900"
               placeholder="Type your problems or suggestions here..."
             />
           </div>
