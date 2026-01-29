@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { sql } from '@vercel/postgres';
+import { DEFAULT_TEACHERS } from '@/constants';
 
 export async function GET() {
-    try {
-        await sql`
+  try {
+    await sql`
       CREATE TABLE IF NOT EXISTS teachers (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -12,7 +13,7 @@ export async function GET() {
       );
     `;
 
-        await sql`
+    await sql`
       CREATE TABLE IF NOT EXISTS evaluations (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         student_id TEXT NOT NULL,
@@ -31,9 +32,21 @@ export async function GET() {
       );
     `;
 
-        return NextResponse.json({ message: "Database initialized successfully" });
-    } catch (error: any) {
-        console.error(error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    // Check if teachers exist, if not insert defaults
+    const { rows: existingTeachers } = await sql`SELECT id FROM teachers LIMIT 1`;
+    if (existingTeachers.length === 0) {
+      for (const t of DEFAULT_TEACHERS) {
+        await sql`
+                    INSERT INTO teachers (id, name, designation, subject)
+                    VALUES (${t.id}, ${t.name}, ${t.designation}, ${t.subject})
+                    ON CONFLICT (id) DO NOTHING;
+                `;
+      }
     }
+
+    return NextResponse.json({ message: "Database initialized and seeded successfully" });
+  } catch (error: any) {
+    console.error(error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }
